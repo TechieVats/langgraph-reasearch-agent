@@ -10,6 +10,7 @@ load_dotenv()
 class ResearchState(TypedDict):
     topic: str
     search_results: List[str]
+    source_urls: List[str]
     summary: str
     quality_score: int
 
@@ -26,7 +27,8 @@ def researcher_agent(state: ResearchState):
     content = [r["content"] for r in results]
     source = [r["url"] for r in results]
     print(f"   Found {len(content)} results.")
-    return {"search_results": content}
+    return {"search_results": content,
+            "source_urls": source}
 
 # --- Agent 2: Summarizer ---
 def summarizer_agent(state: ResearchState):
@@ -45,15 +47,11 @@ SUMMARY: <your summary>
 SCORE: <number only>"""
 
     response = llm.invoke(prompt)
-    print(f"LLM raw response: \n {response}")
     text = response.content
-    print(f"text repsonse: \n {text}")
 
     summary = text.split("SUMMARY:")[1].split("SCORE:")[0].strip()
     score = int(text.split("SCORE:")[1].strip())
-
-    print(f"   Quality score: {score}/10")
-    return {"summary": summary, "quality_score": score}
+    return {"summary": summary, "quality_score": score,"source_urls": state["source_urls"]}
 
 # --- Conditional: retry if quality is too low ---
 def should_retry(state: ResearchState):
@@ -68,6 +66,9 @@ def save_results(state: ResearchState):
         f.write(f"Topic: {state['topic']}\n")
         f.write(f"Quality Score: {state['quality_score']}/10\n\n")
         f.write(f"Summary:\n{state['summary']}\n")
+        f.write("\nSources:\n")
+        for i, url in enumerate(state["source_urls"], 1):
+            f.write(f"{i}. {url}\n")
     print("Done! Results saved to results.txt")
     return state
 
@@ -95,6 +96,7 @@ if __name__ == "__main__":
     result = app.invoke({
         "topic": topic,
         "search_results": [],
+        "source_urls": [],
         "summary": "",
         "quality_score": 0
     })
